@@ -1,10 +1,12 @@
 import contextlib
 import datetime
+import json
 import os
+import random
 import shutil
+import string
 import subprocess
 import sys
-import json
 
 os.environ['GOPATH'] = os.getcwd()
 
@@ -52,6 +54,13 @@ def init():
     os.mkdir('eth')
     with chdir('eth'):
         call(f'{istanbul} setup --num 2 --nodes --verbose --save')
+
+        with open('genesis.json', 'r') as f:
+            data = json.load(f)
+        data['alloc'] = {}
+        with open('genesis.json', 'w') as f:
+            json.dump(data, f, indent='    ')
+
         call(f'{geth} --datadir 0 init genesis.json')
         call(f'{geth} --datadir 1 init genesis.json')
         call(f'{geth} --datadir 2 init genesis.json')
@@ -63,12 +72,18 @@ def init():
             pass
         call(f'{geth} --datadir 0 account import 0/nodekey --password 0/password')
         call(f'{geth} --datadir 1 account import 1/nodekey --password 1/password')
+        with open('2/nodekey', 'w') as f:
+            nodekey = ''.join(random.choices(string.digits + 'abcdef', k=64))
+            f.write(nodekey)
+        call(f'{geth} --datadir 2 account import 2/nodekey --password 2/password')
 
 
 def run0():
     with chdir('eth'):
         call(f'{geth} --datadir 0 --mine --minerthreads 1 --syncmode "full" ' +
-             '--networkid 2017 --port 2000 --istanbul.blockperiod 4 console 2>/tmp/node0.log')
+             '--networkid 2017 --port 2000 --istanbul.blockperiod 4 --rpc ' +
+             '--rpcaddr=0.0.0.0 --ws --wsaddr=0.0.0.0 --rpcapi eth,net,web3,personal,admin ' +
+             '--verbosity 4 console 2>/tmp/node0.log')
 
 
 def run1():
@@ -96,11 +111,11 @@ def run2():
         bootnodes0 = bootnodes0.replace(
             '@0.0.0.0:30303?discport=0', '@127.0.0.1:2000')
         if os.name == 'nt':
-            call(f'{geth} --ipcdisable --datadir 2 --syncmode "full" ' +
-                 '--networkid 2017 --port 2002 --istanbul.blockperiod 4 ' +
+            call(f'{geth} --ipcdisable --datadir 2 --mine --minerthreads 1 ' +
+                 '--syncmode "full" --networkid 2017 --port 2002 --istanbul.blockperiod 4 ' +
                  f'--bootnodes={bootnodes0} console 2>/tmp/node2.log')
         else:
-            call(f'{geth} --datadir 2 --syncmode "full" ' +
+            call(f'{geth} --datadir 2 --mine --minerthreads 1 --syncmode "full" ' +
                  '--networkid 2017 --port 2002 --istanbul.blockperiod 4 ' +
                  f'--bootnodes={bootnodes0} console 2>/tmp/node2.log')
 

@@ -193,9 +193,15 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			return nil, errUnauthorized
 		}
 
+		extra, err := types.ExtractIstanbulExtra(header)
+		if err != nil {
+			return nil, err
+		}
+		candidate := extra.Candidate
+
 		// Header authorized, discard any previous votes from the validator
 		for i, vote := range snap.Votes {
-			if vote.Validator == validator && vote.Address == header.Coinbase {
+			if vote.Validator == validator && vote.Address == candidate {
 				// Uncast the vote from the cached tally
 				snap.uncast(vote.Address, vote.Authorize)
 
@@ -214,24 +220,24 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		default:
 			return nil, errInvalidVote
 		}
-		if snap.cast(header.Coinbase, authorize) {
+		if snap.cast(candidate, authorize) {
 			snap.Votes = append(snap.Votes, &Vote{
 				Validator: validator,
 				Block:     number,
-				Address:   header.Coinbase,
+				Address:   candidate,
 				Authorize: authorize,
 			})
 		}
 		// If the vote passed, update the list of validators
-		if tally := snap.Tally[header.Coinbase]; tally.Votes > snap.ValSet.Size()/2 {
+		if tally := snap.Tally[candidate]; tally.Votes > snap.ValSet.Size()/2 {
 			if tally.Authorize {
-				snap.ValSet.AddValidator(header.Coinbase)
+				snap.ValSet.AddValidator(candidate)
 			} else {
-				snap.ValSet.RemoveValidator(header.Coinbase)
+				snap.ValSet.RemoveValidator(candidate)
 
 				// Discard any previous votes the deauthorized validator cast
 				for i := 0; i < len(snap.Votes); i++ {
-					if snap.Votes[i].Validator == header.Coinbase {
+					if snap.Votes[i].Validator == candidate {
 						// Uncast the vote from the cached tally
 						snap.uncast(snap.Votes[i].Address, snap.Votes[i].Authorize)
 
@@ -244,12 +250,12 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			}
 			// Discard any previous votes around the just changed account
 			for i := 0; i < len(snap.Votes); i++ {
-				if snap.Votes[i].Address == header.Coinbase {
+				if snap.Votes[i].Address == candidate {
 					snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
 					i--
 				}
 			}
-			delete(snap.Tally, header.Coinbase)
+			delete(snap.Tally, candidate)
 		}
 	}
 	snap.Number += uint64(len(headers))

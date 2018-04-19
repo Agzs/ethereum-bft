@@ -317,7 +317,7 @@ func (sb *backend) VerifySeal(chain consensus.ChainReader, header *types.Header)
 // rules of a particular engine. The changes are executed inline.
 func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	// unused fields, force to set to empty
-	header.Coinbase = common.Address{}
+	// header.Coinbase = common.Address{}
 	header.Nonce = emptyNonce
 	header.MixDigest = types.IstanbulDigest
 
@@ -349,10 +349,10 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 	sb.candidatesLock.RUnlock()
 
 	// pick one of the candidates randomly
+	index := -1
 	if len(addresses) > 0 {
-		index := rand.Intn(len(addresses))
+		index = rand.Intn(len(addresses))
 		// add validator voting in coinbase
-		header.Coinbase = addresses[index]
 		if authorizes[index] {
 			copy(header.Nonce[:], nonceAuthVote)
 		} else {
@@ -360,8 +360,13 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 		}
 	}
 
+	var extra []byte
+	if index == -1 {
+		extra, err = prepareExtra(header, snap.validators(), common.Address{})
+	} else {
+		extra, err = prepareExtra(header, snap.validators(), addresses[index])
+	}
 	// add validators in snapshot to extraData's validators section
-	extra, err := prepareExtra(header, snap.validators())
 	if err != nil {
 		return err
 	}
@@ -375,6 +380,11 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 	return nil
 }
 
+var (
+	FrontierBlockReward  *big.Int = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward *big.Int = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
+)
+
 // Finalize runs any post-transaction state modifications (e.g. block rewards)
 // and assembles the final block.
 //
@@ -383,6 +393,13 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// No block rewards in Istanbul, so the state remains as is and uncles are dropped
+	blockReward := FrontierBlockReward
+	if chain.Config().IsByzantium(header.Number) {
+		blockReward = ByzantiumBlockReward
+	}
+	// author, _ := sb.Author(chain.CurrentHeader())
+	state.AddBalance(header.Coinbase, blockReward)
+
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = nilUncleHash
 
@@ -642,7 +659,7 @@ func ecrecover(header *types.Header) (common.Address, error) {
 }
 
 // prepareExtra returns a extra-data of the given header and validators
-func prepareExtra(header *types.Header, vals []common.Address) ([]byte, error) {
+func prepareExtra(header *types.Header, vals []common.Address, candidate common.Address) ([]byte, error) {
 	var buf bytes.Buffer
 
 	// compensate the lack bytes if header.Extra is not enough IstanbulExtraVanity bytes.
@@ -655,6 +672,7 @@ func prepareExtra(header *types.Header, vals []common.Address) ([]byte, error) {
 		Validators:    vals,
 		Seal:          []byte{},
 		CommittedSeal: [][]byte{},
+		Candidate:     candidate,
 	}
 
 	payload, err := rlp.EncodeToBytes(&ist)
