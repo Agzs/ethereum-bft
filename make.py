@@ -52,6 +52,13 @@ def init():
     os.mkdir('eth')
     with chdir('eth'):
         call(f'{istanbul} setup --num 2 --nodes --verbose --save')
+
+        with open('genesis.json', 'r') as f:
+            data = json.load(f)
+        data['alloc'] = {}
+        with open('genesis.json', 'w') as f:
+            json.dump(data, f, indent='    ')
+
         call(f'{geth} --datadir 0 init genesis.json')
         call(f'{geth} --datadir 1 init genesis.json')
         call(f'{geth} --datadir 2 init genesis.json')

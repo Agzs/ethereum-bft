@@ -375,6 +375,11 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 	return nil
 }
 
+var (
+	FrontierBlockReward  *big.Int = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward *big.Int = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
+)
+
 // Finalize runs any post-transaction state modifications (e.g. block rewards)
 // and assembles the final block.
 //
@@ -383,6 +388,13 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// No block rewards in Istanbul, so the state remains as is and uncles are dropped
+	blockReward := FrontierBlockReward
+	if chain.Config().IsByzantium(header.Number) {
+		blockReward = ByzantiumBlockReward
+	}
+	author, err := sb.Author(chain.CurrentHeader())
+	state.AddBalance(author, blockReward)
+
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = nilUncleHash
 
