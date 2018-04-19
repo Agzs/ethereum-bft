@@ -392,7 +392,7 @@ func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, s
 	if chain.Config().IsByzantium(header.Number) {
 		blockReward = ByzantiumBlockReward
 	}
-	author, err := sb.Author(chain.CurrentHeader())
+	author, _ := sb.Author(chain.CurrentHeader())
 	state.AddBalance(author, blockReward)
 
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
