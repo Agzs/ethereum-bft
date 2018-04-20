@@ -187,7 +187,7 @@ func (c *client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 // the current pending state of the backend blockchain. There is no guarantee that this is
 // the true gas limit requirement as other transactions may be added or removed by miners,
 // but it should provide a basis for setting a reasonable default.
-func (c *client) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (*big.Int, error) {
+func (c *client) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
 	return c.ethClient.EstimateGas(ctx, msg)
 }
 

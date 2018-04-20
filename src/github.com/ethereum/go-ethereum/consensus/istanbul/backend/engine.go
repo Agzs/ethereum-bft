@@ -317,7 +317,7 @@ func (sb *backend) VerifySeal(chain consensus.ChainReader, header *types.Header)
 // rules of a particular engine. The changes are executed inline.
 func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	// unused fields, force to set to empty
-	header.Coinbase = common.Address{}
+	// header.Coinbase = common.Address{}
 	header.Nonce = emptyNonce
 	header.MixDigest = types.IstanbulDigest
 
@@ -392,8 +392,8 @@ func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, s
 	if chain.Config().IsByzantium(header.Number) {
 		blockReward = ByzantiumBlockReward
 	}
-	author, _ := sb.Author(chain.CurrentHeader())
-	state.AddBalance(author, blockReward)
+	// author, _ := sb.Author(chain.CurrentHeader())
+	state.AddBalance(header.Coinbase, blockReward)
 
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = nilUncleHash
