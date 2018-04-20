@@ -349,10 +349,10 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 	sb.candidatesLock.RUnlock()
 
 	// pick one of the candidates randomly
+	index := -1
 	if len(addresses) > 0 {
-		index := rand.Intn(len(addresses))
+		index = rand.Intn(len(addresses))
 		// add validator voting in coinbase
-		header.Coinbase = addresses[index]
 		if authorizes[index] {
 			copy(header.Nonce[:], nonceAuthVote)
 		} else {
@@ -360,8 +360,13 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 		}
 	}
 
+	var extra []byte
+	if index == -1 {
+		extra, err = prepareExtra(header, snap.validators(), common.Address{})
+	} else {
+		extra, err = prepareExtra(header, snap.validators(), addresses[index])
+	}
 	// add validators in snapshot to extraData's validators section
-	extra, err := prepareExtra(header, snap.validators())
 	if err != nil {
 		return err
 	}
@@ -654,7 +659,7 @@ func ecrecover(header *types.Header) (common.Address, error) {
 }
 
 // prepareExtra returns a extra-data of the given header and validators
-func prepareExtra(header *types.Header, vals []common.Address) ([]byte, error) {
+func prepareExtra(header *types.Header, vals []common.Address, candidate common.Address) ([]byte, error) {
 	var buf bytes.Buffer
 
 	// compensate the lack bytes if header.Extra is not enough IstanbulExtraVanity bytes.
@@ -667,6 +672,7 @@ func prepareExtra(header *types.Header, vals []common.Address) ([]byte, error) {
 		Validators:    vals,
 		Seal:          []byte{},
 		CommittedSeal: [][]byte{},
+		Candidate:     candidate,
 	}
 
 	payload, err := rlp.EncodeToBytes(&ist)
