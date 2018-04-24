@@ -250,12 +250,12 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			}
 			// Discard any previous votes around the just changed account
 			for i := 0; i < len(snap.Votes); i++ {
-				if snap.Votes[i].Address == header.Coinbase {
+				if snap.Votes[i].Address == candidate {
 					snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
 					i--
 				}
 			}
-			delete(snap.Tally, header.Coinbase)
+			delete(snap.Tally, candidate)
 		}
 	}
 	snap.Number += uint64(len(headers))
